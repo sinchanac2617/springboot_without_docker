@@ -1,54 +1,62 @@
 pipeline {
 
-    agent none
+    agent any
 
     tools {
-        maven 'maven'       // ✔ Uses Jenkins Maven tool
+        maven 'maven'        // Do NOT change - must match Maven tool name in Jenkins
+    }
+
+    environment {
+        APP_SERVER_IP = "172.31.29.138"     // 🔵 CHANGE HERE: Put your App Server PRIVATE IP
+        APP_USER      = "ubuntu"            // 🔵 CHANGE if your EC2 username is different
+        APP_NAME      = "springbootapp"     // Optional: name for logs & process
     }
 
     stages {
 
         stage('Checkout Code') {
-            agent { label 'worker-node' }
             steps {
-                echo "===== CHECKING OUT FROM GITHUB ====="
+                echo "===== Pulling Code from GitHub ====="
                 git branch: 'main', url: 'https://github.com/sinchanac2617/springboot_without_docker.git'
+                // 🔵 CHANGE URL if your GitHub repo name is different
             }
         }
 
-        stage('Build on Worker Node') {
-            agent { label 'worker-node' }
+        stage('Build JAR File') {
             steps {
-                sh '''
-                    echo "===== JAVA VERSION ====="
-                    java -version
-
-                    echo "===== MAVEN VERSION (JENKINS TOOL) ====="
-                    mvn -version
-
-                    echo "===== BUILDING PROJECT ====="
+                sh """
                     mvn clean package -DskipTests
-                '''
+                """
             }
         }
 
-        stage('Deploy Spring Boot App') {
-            agent { label 'worker-node' }
+        stage('Copy Artifact to App Server') {
             steps {
-                sh '''
-                    APP_NAME=myapp
-                    JAR_FILE=target/*.jar
+                sh """
+                    scp -o StrictHostKeyChecking=no target/*.jar ${APP_USER}@${APP_SERVER_IP}:/home/${APP_USER}/app.jar
+                    // 🔵 Ensure SSH key is configured in Jenkins Credentials
+                """
+            }
+        }
 
-                    echo "Stopping old application..."
-                    pkill -f $APP_NAME || true
-
-                    echo "Starting new application..."
-                    nohup java -jar $JAR_FILE > /tmp/$APP_NAME.log 2>&1 &
-
-                    echo "Application Deployed Successfully!"
-                '''
+        stage('Deploy Spring Boot Application') {
+            steps {
+                sh """
+                    ssh -o StrictHostKeyChecking=no ${APP_USER}@${APP_SERVER_IP} "
+                        pkill -f app.jar || true
+                        nohup java -jar /home/${APP_USER}/app.jar --server.port=8082 > app.log 2>&1 &
+                    "
+                """
             }
         }
     }
-}
 
+    post {
+        success {
+            echo "🎉 SUCCESS: App deployed to App Server and running on port 8082"
+        }
+        failure {
+            echo "❌ BUILD/DEPLOY FAILED"
+        }
+    }
+}
