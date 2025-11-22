@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        APP_SERVER_IP = "172.31.29.138"     // 🔵 CHANGE HERE: Put your App Server PRIVATE IP
+        APP_SERVER_IP = "172.31.25.217"     // 🔵 CHANGE HERE: Put your App Server PRIVATE IP
         APP_USER      = "ubuntu"            // 🔵 CHANGE if your EC2 username is different
         APP_NAME      = "springbootapp"     // Optional: name for logs & process
     }
